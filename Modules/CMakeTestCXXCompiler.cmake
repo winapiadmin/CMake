@@ -49,6 +49,7 @@ if(NOT CMAKE_CXX_COMPILER_WORKS)
     "#ifndef __cplusplus\n"
     "# error \"The CMAKE_CXX_COMPILER is set to a C compiler\"\n"
     "#endif\n"
+    "#include <iostream>\n"
     "int main(){return 0;}\n")
   # Clear result from normal variable.
   unset(CMAKE_CXX_COMPILER_WORKS)
