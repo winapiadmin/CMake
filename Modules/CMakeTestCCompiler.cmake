@@ -42,6 +42,7 @@ if(NOT CMAKE_C_COMPILER_WORKS)
     "#ifdef __cplusplus\n"
     "# error \"The CMAKE_C_COMPILER is set to a C++ compiler\"\n"
     "#endif\n"
+    "#include<stdio.h>\n"
     "#if defined(__CLASSIC_C__)\n"
     "int main(argc, argv)\n"
     "  int argc;\n"
