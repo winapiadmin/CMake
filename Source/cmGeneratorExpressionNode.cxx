@@ -3583,6 +3583,7 @@ namespace {
 bool GetFileSet(std::vector<std::string> const& parameters,
                 cm::GenEx::Evaluation* eval,
                 GeneratorExpressionContent const* content,
+                cmGeneratorTarget const*& target,
                 cmGeneratorFileSet const*& fileSet)
 {
   auto const& fileSetName = parameters[0];
@@ -3602,7 +3603,7 @@ bool GetFileSet(std::vector<std::string> const& parameters,
     cmLocalGenerator const* lg = eval->CurrentTarget
       ? eval->CurrentTarget->GetLocalGenerator()
       : eval->Context.LG;
-    auto const* target = lg->FindGeneratorTargetToUse(targetName);
+    target = lg->FindGeneratorTargetToUse(targetName);
     if (!target) {
       reportError(eval, content->GetOriginalExpression(),
                   cmStrCat("Non-existent target: ", targetName));
@@ -3638,8 +3639,9 @@ static const struct FileSetExistsNode : public cmGeneratorExpressionNode
       return std::string{};
     }
 
+    cmGeneratorTarget const* target = nullptr;
     cmGeneratorFileSet const* fileSet = nullptr;
-    if (!GetFileSet(parameters, eval, content, fileSet)) {
+    if (!GetFileSet(parameters, eval, content, target, fileSet)) {
       return std::string{};
     }
 
@@ -3657,7 +3659,7 @@ static const struct FileSetPropertyNode : public cmGeneratorExpressionNode
   std::string Evaluate(
     std::vector<std::string> const& parameters, cm::GenEx::Evaluation* eval,
     GeneratorExpressionContent const* content,
-    cmGeneratorExpressionDAGChecker* /*dagCheckerParent*/) const override
+    cmGeneratorExpressionDAGChecker* dagCheckerParent) const override
   {
     static cmsys::RegularExpression propertyNameValidator("^[A-Za-z0-9_]+$");
 
@@ -3690,8 +3692,9 @@ static const struct FileSetPropertyNode : public cmGeneratorExpressionNode
       return std::string{};
     }
 
+    cmGeneratorTarget const* target = nullptr;
     cmGeneratorFileSet const* fileSet = nullptr;
-    if (!GetFileSet(parameters, eval, content, fileSet)) {
+    if (!GetFileSet(parameters, eval, content, target, fileSet)) {
       return std::string{};
     }
     if (!fileSet) {
@@ -3701,7 +3704,32 @@ static const struct FileSetPropertyNode : public cmGeneratorExpressionNode
       return std::string{};
     }
 
-    return fileSet->GetProperty(propertyName);
+    auto result = fileSet->GetProperty(propertyName);
+
+    if (propertyName == "BASE_DIRS"_s || propertyName == "SOURCES"_s ||
+        propertyName == "INTERFACE_SOURCES"_s) {
+      cmGeneratorExpressionDAGChecker dagChecker{
+        target,           propertyName,  content,
+        dagCheckerParent, eval->Context, eval->Backtrace,
+      };
+      switch (dagChecker.Check()) {
+        case cmGeneratorExpressionDAGChecker::SELF_REFERENCE:
+          dagChecker.ReportError(eval, content->GetOriginalExpression());
+          return std::string{};
+        case cmGeneratorExpressionDAGChecker::CYCLIC_REFERENCE:
+          // No error. We just skip cyclic references.
+          return std::string{};
+        case cmGeneratorExpressionDAGChecker::ALREADY_SEEN:
+        case cmGeneratorExpressionDAGChecker::DAG:
+          break;
+      }
+
+      return cmGeneratorExpression::StripEmptyListElements(
+        this->EvaluateDependentExpression(result, eval, target, &dagChecker,
+                                          target));
+    }
+
+    return result;
   }
 } fileSetPropertyNode;
 
@@ -4307,6 +4335,55 @@ static const struct TargetObjectsNode : public cmGeneratorExpressionNode
       return std::string();
     }
 
+    std::vector<std::string> sourceFilePaths;
+    for (auto const& arg : cmMakeRange(parameters).advance(1)) {
+      if (cmHasLiteralPrefix(arg, "SOURCE_FILES:")) {
+        cm::string_view listView{ arg.c_str() + cmStrLen("SOURCE_FILES:") };
+        std::size_t semicolon;
+        std::size_t start = 0;
+        do {
+          semicolon = listView.find(';', start);
+          sourceFilePaths.push_back(
+            std::string{ listView.substr(start, semicolon - start) });
+          start = semicolon + 1;
+        } while (semicolon != cm::string_view::npos);
+      } else {
+        reportError(eval, content->GetOriginalExpression(),
+                    cmStrCat("Unrecognized argument:\n  ", arg));
+        return std::string();
+      }
+    }
+
+    if (gt->IsImported() && !sourceFilePaths.empty()) {
+      reportError(
+        eval, content->GetOriginalExpression(),
+        cmStrCat("Cannot use SOURCE_FILES argument on imported target \"",
+                 tgtName, '"'));
+      return std::string();
+    }
+    std::set<cmSourceFile const*> sourceFiles;
+    for (auto const& sf : gt->GetSourceFiles(eval->Context.Config)) {
+      sourceFiles.insert(sf.Value);
+    }
+    std::set<cmSourceFile const*> filteredSourceFiles;
+    for (auto const& path : sourceFilePaths) {
+      if (!cmSystemTools::FileIsFullPath(path)) {
+        reportError(
+          eval, content->GetOriginalExpression(),
+          cmStrCat("Source file:\n  ", path, "\nis not an absolute path"));
+        return std::string();
+      }
+
+      auto const* sf = gt->Makefile->GetSource(path);
+      if (!sf || !sourceFiles.count(sf)) {
+        reportError(eval, content->GetOriginalExpression(),
+                    cmStrCat("Source file:\n  ", path,
+                             "\ndoes not exist for target \"", tgtName, '"'));
+        return std::string();
+      }
+      filteredSourceFiles.insert(sf);
+    }
+
     cmList objects;
 
     if (gt->IsImported()) {
@@ -4319,7 +4396,11 @@ static const struct TargetObjectsNode : public cmGeneratorExpressionNode
       }
       eval->HadContextSensitiveCondition = true;
     } else {
-      gt->GetTargetObjectNames(eval->Context.Config, objects);
+      auto const filter =
+        [&filteredSourceFiles](cmSourceFile const& sf) -> bool {
+        return filteredSourceFiles.empty() || filteredSourceFiles.count(&sf);
+      };
+      gt->GetTargetObjectNames(eval->Context.Config, filter, objects);
 
       std::string obj_dir;
       if (eval->EvaluateForBuildsystem && !gg->SupportsCrossConfigs()) {
@@ -4345,6 +4426,8 @@ static const struct TargetObjectsNode : public cmGeneratorExpressionNode
 
     return objects.to_string();
   }
+
+  int NumExpectedParameters() const override { return OneOrMoreParameters; }
 } targetObjectsNode;
 
 struct TargetRuntimeDllsBaseNode : public cmGeneratorExpressionNode

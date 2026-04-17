@@ -1372,7 +1372,8 @@ bool cmQtAutoGenInitializer::InitAutogenTarget()
     auto const& gen = this->GlobalGen->GetName();
     return this->QtVersion >= IntegerVersion(5, 15) &&
       (gen.find("Ninja") != std::string::npos ||
-       gen.find("Make") != std::string::npos);
+       gen.find("Make") != std::string::npos ||
+       gen.find("Visual Studio") != std::string::npos || gen == "Xcode");
   }();
 
   // Files provided by the autogen target
@@ -1451,6 +1452,10 @@ bool cmQtAutoGenInitializer::InitAutogenTarget()
     }
     // Cannot use PRE_BUILD when a global autogen target is in place
     if (this->AutogenTarget.GlobalTarget) {
+      usePRE_BUILD = false;
+    }
+    // Cannot use PRE_BUILD with depfiles
+    if (useDepfile) {
       usePRE_BUILD = false;
     }
   }
@@ -1994,7 +1999,7 @@ bool cmQtAutoGenInitializer::SetupWriteAutogenInfo()
     info.SetBool("MOC_RELAXED_MODE", this->Moc.RelaxedMode);
     info.SetBool("MOC_PATH_PREFIX", this->Moc.PathPrefix);
 
-    EvaluatedTargetPropertyEntries InterfaceAutoMocMacroNamesEntries;
+    cm::EvaluatedTargetPropertyEntries InterfaceAutoMocMacroNamesEntries;
 
     if (this->MultiConfig) {
       for (auto const& cfg : this->ConfigsList) {
@@ -2003,10 +2008,10 @@ bool cmQtAutoGenInitializer::SetupWriteAutogenInfo()
           cmGeneratorExpressionDAGChecker dagChecker{
             this->GenTarget, "AUTOMOC_MACRO_NAMES", nullptr, nullptr, context,
           };
-          AddInterfaceEntries(this->GenTarget, "INTERFACE_AUTOMOC_MACRO_NAMES",
-                              context, &dagChecker,
-                              InterfaceAutoMocMacroNamesEntries,
-                              IncludeRuntimeInterface::Yes);
+          cm::AddInterfaceEntries(
+            this->GenTarget, "INTERFACE_AUTOMOC_MACRO_NAMES", context,
+            &dagChecker, InterfaceAutoMocMacroNamesEntries,
+            cm::IncludeRuntimeInterface::Yes);
         }
       }
     } else {
@@ -2016,7 +2021,7 @@ bool cmQtAutoGenInitializer::SetupWriteAutogenInfo()
       };
       AddInterfaceEntries(
         this->GenTarget, "INTERFACE_AUTOMOC_MACRO_NAMES", context, &dagChecker,
-        InterfaceAutoMocMacroNamesEntries, IncludeRuntimeInterface::Yes);
+        InterfaceAutoMocMacroNamesEntries, cm::IncludeRuntimeInterface::Yes);
     }
 
     for (auto const& entry : InterfaceAutoMocMacroNamesEntries.Entries) {

@@ -131,7 +131,9 @@ if(BUILD_TESTING)
     set(CMake_TEST_RESOURCES TRUE)
   endif()
   # For some Windows toolchains there is no resource support.
-  if(WATCOM OR BORLAND OR CMAKE_C_COMPILER_ID STREQUAL "OrangeC")
+  if(WATCOM OR BORLAND
+      OR (CMAKE_C_COMPILER_ID STREQUAL "OrangeC" AND
+          CMAKE_C_COMPILER_VERSION VERSION_LESS "7.0"))
     set(CMake_TEST_RESOURCES FALSE)
   endif()
 
@@ -260,6 +262,10 @@ if(BUILD_TESTING)
     unset(_sysctl_result)
     unset(_sysctl_stderr)
     unset(_sysctl_stdout)
+  endif()
+
+  if(CMake_TEST_CUDA AND NOT CMake_TEST_CUDA MATCHES "^(NVIDIA|Clang)$")
+    message(FATAL_ERROR "CMake_TEST_CUDA should be \"NVIDIA\" or \"Clang\", got \"${CMake_TEST_CUDA}\"")
   endif()
 
   #---------------------------------------------------------------------------
@@ -464,6 +470,7 @@ if(BUILD_TESTING)
   if(CMake_TEST_Rust)
     ADD_TEST_MACRO(RustOnly RustOnly)
     ADD_TEST_MACRO(RustMix RustMix)
+    ADD_TEST_MACRO(RustPie RustPie)
   endif()
   if(CMAKE_Fortran_COMPILER)
     ADD_TEST_MACRO(FortranOnly FortranOnly)
@@ -523,6 +530,7 @@ if(BUILD_TESTING)
   endif()
 
   ADD_TEST_MACRO(COnly COnly)
+  set_property(TEST COnly APPEND PROPERTY LABELS "PellesC")
   ADD_TEST_MACRO(CxxOnly CxxOnly)
   ADD_TEST_MACRO(CxxSubdirC CxxSubdirC)
   ADD_TEST_MACRO(OutDir runtime/OutDir)
@@ -3014,7 +3022,7 @@ if(BUILD_TESTING)
     )
   #make sure all 3 subdirs were added
   set_tests_properties(CTestTestSubdir PROPERTIES
-    PASS_REGULAR_EXPRESSION "0 tests failed out of 3")
+    PASS_REGULAR_EXPRESSION "100% tests passed out of 3")
 
   configure_file(
     "${CMake_SOURCE_DIR}/Tests/CTestTestDepends/test.cmake.in"

@@ -4,7 +4,6 @@
 
 #include <array>
 #include <cstdio>
-#include <cstring>
 #include <functional>
 #include <set>
 #include <sstream>
@@ -85,7 +84,6 @@ std::string const kCMAKE_TRY_COMPILE_OSX_ARCHITECTURES =
   "CMAKE_TRY_COMPILE_OSX_ARCHITECTURES";
 std::string const kCMAKE_TRY_COMPILE_PLATFORM_VARIABLES =
   "CMAKE_TRY_COMPILE_PLATFORM_VARIABLES";
-std::string const kCMAKE_WARN_DEPRECATED = "CMAKE_WARN_DEPRECATED";
 std::string const kCMAKE_WATCOM_RUNTIME_LIBRARY_DEFAULT =
   "CMAKE_WATCOM_RUNTIME_LIBRARY_DEFAULT";
 std::string const kCMAKE_MSVC_DEBUG_INFORMATION_FORMAT_DEFAULT =
@@ -1137,7 +1135,6 @@ cm::optional<cmTryCompileResult> cmCoreTryCompile::TryCompileCode(
     vars.insert(kCMAKE_SYSROOT);
     vars.insert(kCMAKE_SYSROOT_COMPILE);
     vars.insert(kCMAKE_SYSROOT_LINK);
-    vars.insert(kCMAKE_WARN_DEPRECATED);
     vars.emplace("CMAKE_MSVC_RUNTIME_LIBRARY"_s);
     vars.emplace("CMAKE_WATCOM_RUNTIME_LIBRARY"_s);
     vars.emplace("CMAKE_MSVC_DEBUG_INFORMATION_FORMAT"_s);
@@ -1368,8 +1365,8 @@ void cmCoreTryCompile::CleanupFiles(std::string const& binDir)
   dir.Load(binDir);
   std::set<std::string> deletedFiles;
   for (unsigned long i = 0; i < dir.GetNumberOfFiles(); ++i) {
-    char const* fileName = dir.GetFile(i);
-    if (strcmp(fileName, ".") != 0 && strcmp(fileName, "..") != 0 &&
+    std::string const& fileName = dir.GetFileName(i);
+    if (fileName != "." && fileName != ".." &&
         // Do not delete NFS temporary files.
         !cmHasPrefix(fileName, ".nfs")) {
       if (deletedFiles.insert(fileName).second) {

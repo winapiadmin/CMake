@@ -151,6 +151,8 @@ add_library(
   cmComputeTargetDepends.cxx
   cmConfigureLog.h
   cmConfigureLog.cxx
+  cmConstStack.h
+  cmConstStack.tcc
   cmCPackPropertiesGenerator.h
   cmCPackPropertiesGenerator.cxx
   cmCryptoHash.cxx
@@ -185,12 +187,16 @@ add_library(
   cmDependsJavaParserHelper.h
   cmDependsCompiler.cxx
   cmDependsCompiler.h
+  cmDiagnostics.h
+  cmDiagnostics.cxx
   cmDocumentation.cxx
   cmDocumentationFormatter.cxx
   cmDyndepCollation.cxx
   cmDyndepCollation.h
   cmELF.h
   cmELF.cxx
+  cmEnvironment.cxx
+  cmEnvironment.h
   cmEvaluatedTargetProperty.cxx
   cmEvaluatedTargetProperty.h
   cmExprParserHelper.cxx
@@ -309,6 +315,7 @@ add_library(
   cmGeneratorTarget.cxx
   cmGeneratorTarget.h
   cmGeneratorTarget_CompatibleInterface.cxx
+  cmGeneratorTarget_HeaderSetVerification.cxx
   cmGeneratorTarget_IncludeDirectories.cxx
   cmGeneratorTarget_Link.cxx
   cmGeneratorTarget_LinkDirectories.cxx
@@ -337,6 +344,8 @@ add_library(
   cmInstallAndroidMKExportGenerator.h
   cmInstallCMakeConfigExportGenerator.cxx
   cmInstallCMakeConfigExportGenerator.h
+  cmInstallDirs.cxx
+  cmInstallDirs.h
   cmInstallGenerator.h
   cmInstallGenerator.cxx
   cmInstallGetRuntimeDependenciesGenerator.h
@@ -479,8 +488,6 @@ add_library(
   cmSourceFileLocationKind.h
   cmSourceGroup.cxx
   cmSourceGroup.h
-  cmStack.h
-  cmStack.tcc
   cmStandardLevel.h
   cmStandardLevelResolver.cxx
   cmStandardLevelResolver.h
@@ -578,6 +585,8 @@ add_library(
   cmBreakCommand.h
   cmBuildCommand.cxx
   cmBuildCommand.h
+  cmCMakeDiagnosticCommand.cxx
+  cmCMakeDiagnosticCommand.h
   cmCMakeHostSystemInformationCommand.cxx
   cmCMakeHostSystemInformationCommand.h
   cmCMakeLanguageCommand.cxx
@@ -602,6 +611,8 @@ add_library(
   cmCreateTestSourceList.h
   cmDefinePropertyCommand.cxx
   cmDefinePropertyCommand.h
+  cmDiscoverTestsCommand.cxx
+  cmDiscoverTestsCommand.h
   cmEnableLanguageCommand.cxx
   cmEnableLanguageCommand.h
   cmEnableTestingCommand.cxx
@@ -1134,6 +1145,7 @@ add_library(
   CTest/cmCTestCoverageCommand.cxx
   CTest/cmCTestCoverageHandler.cxx
   CTest/cmCTestCurl.cxx
+  CTest/cmCTestDiscoverTests.cxx
   CTest/cmParseMumpsCoverage.cxx
   CTest/cmParseCacheCoverage.cxx
   CTest/cmParseGTMCoverage.cxx

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <functional>
 #include <iterator>
 #include <map>
 #include <set>
@@ -379,6 +380,9 @@ TargetProperty const StaticTargetProperties[] = {
   { "Swift_LANGUAGE_VERSION"_s, IC::CanCompileSources },
   { "Swift_MODULE_DIRECTORY"_s, IC::CanCompileSources },
   { "Swift_COMPILATION_MODE"_s, IC::CanCompileSources },
+  // ---- Rust
+  { "Rust_EDITION"_s, IC::CanCompileSources },
+  { "Rust_MAIN_CRATE_ROOT"_s, IC::CanCompileSources },
   // ---- moc
   { "AUTOMOC"_s, IC::CanCompileSources },
   { "AUTOMOC_COMPILER_PREDEFINES"_s, IC::CanCompileSources },
@@ -710,6 +714,12 @@ cmTargetInternals::cmTargetInternals()
                       "Header"_s, "The default header set"_s, "Header set"_s,
                       FileSetEntries{ "HEADER_SETS"_s },
                       FileSetEntries{ "INTERFACE_HEADER_SETS"_s } } },
+                  { cm::FileSetMetadata::SOURCES,
+                    { cm::FileSetMetadata::SOURCES, "SOURCE_DIRS"_s,
+                      "SOURCE_SET"_s, "SOURCE_DIRS_"_s, "SOURCE_SET_"_s,
+                      "Source"_s, "The default source set"_s, "Source set"_s,
+                      FileSetEntries{ "SOURCE_SETS"_s },
+                      FileSetEntries{ "INTERFACE_SOURCE_SETS"_s } } },
                   { cm::FileSetMetadata::CXX_MODULES,
                     { cm::FileSetMetadata::CXX_MODULES, "CXX_MODULE_DIRS"_s,
                       "CXX_MODULE_SET"_s, "CXX_MODULE_DIRS_"_s,
@@ -3160,7 +3170,7 @@ std::pair<cmFileSet*, bool> cmTarget::GetOrCreateFileSet(
   cm::FileSetMetadata::Visibility vis)
 {
   auto result = this->impl->FileSets.emplace(
-    name, cmFileSet(this->GetMakefile(), name, type, vis));
+    name, cmFileSet(this->GetMakefile(), this, name, type, vis));
   if (result.second) {
     auto bt = this->impl->Makefile->GetBacktrace();
     if (cm::contains(this->impl->FileSetTypes, type)) {
@@ -3202,7 +3212,12 @@ std::vector<std::string> cmTarget::GetAllFileSetNames() const
   return result;
 }
 
-std::vector<std::string> cmTarget::GetAllInterfaceFileSets() const
+namespace {
+std::vector<std::string> RetrieveFileSetNames(
+  std::unordered_map<cm::string_view, FileSetType> const& fileSetTypes,
+  std::function<
+    std::vector<BT<std::string>> const&(FileSetType const& fileSetType)>
+    GetFileSets)
 {
   std::vector<std::string> result;
   auto inserter = std::back_inserter(result);
@@ -3214,11 +3229,30 @@ std::vector<std::string> cmTarget::GetAllInterfaceFileSets() const
     }
   };
 
-  for (auto const& fileSetType : this->impl->FileSetTypes) {
-    appendEntries(fileSetType.second.InterfaceEntries.Entries);
+  for (auto const& fileSetType : fileSetTypes) {
+    appendEntries(GetFileSets(fileSetType.second));
   }
 
   return result;
+}
+}
+
+std::vector<std::string> cmTarget::GetAllPrivateFileSets() const
+{
+  return RetrieveFileSetNames(
+    this->impl->FileSetTypes,
+    [](FileSetType const& fileSetType) -> std::vector<BT<std::string>> const& {
+      return fileSetType.SelfEntries.Entries;
+    });
+}
+
+std::vector<std::string> cmTarget::GetAllInterfaceFileSets() const
+{
+  return RetrieveFileSetNames(
+    this->impl->FileSetTypes,
+    [](FileSetType const& fileSetType) -> std::vector<BT<std::string>> const& {
+      return fileSetType.InterfaceEntries.Entries;
+    });
 }
 
 bool cmTarget::HasFileSets() const
